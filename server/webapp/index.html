@@ -1,0 +1,153 @@
+<html>
+
+<head>
+<style>
+table {
+    font-family: arial, sans-serif;
+    border-collapse: collapse;
+    width: 20%;
+	height: 20%;
+}
+
+td, th {
+    border: 1px solid #dddddd;
+	color: black;
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    /*font-size: 10em;*/
+    font-weight: bold;
+    text-align: center;
+	height: 20px;
+	width:20px
+}
+
+</style>
+
+<script>
+	(function(){
+		let moves = {};
+		let symbol = "";
+		let waiting = true;
+		
+		let connection = new WebSocket('ws://'+window.location.hostname+':'+window.location.port);
+		connection.onopen = (() => {
+		  console.log('Web socket connection opened @ ' + 'ws://'+window.location.hostname+':'+window.location.port);
+		});
+
+		connection.onerror = ((error) => {
+		  console.error(error);
+		});
+		
+		connection.onmessage = ((message) => {
+		  let data = JSON.parse(message.data);		 
+		  if(data.type === 'players'){
+			let playersDropDown = document.getElementById('players');
+			let options = "<option selected>--Players--</options>";
+			data.players.forEach(function(player){
+				options+='<option value='+player.id+'>'+player.name+'</option>';
+			});
+			playersDropDown.innerHTML = options;
+		  } else if(data.type === 'challenged') {
+				//alert('YOU ARE CHALLENGED BY '+data.challenger);							
+				var txt;
+				if (confirm("Accept Challenge from "+data.challenger+" and start! ")) {					
+					connection.send(JSON.stringify({
+                        type: 'challenge_accepted'
+                    }));
+					waiting = false;
+				} else {
+					connection.send(JSON.stringify({
+                        type: 'challenge_rejected'
+                    }));
+				}				
+		   } else if(data.type === 'move') {
+				renderGame(data.data);				
+				if(data.status === 'won') {
+					setTimeout(function(){ alert('Congratulations ! YOU WON !!!')},10);
+				} else if(data.status === 'lost'){				
+					setTimeout(function(){ alert('OHHH ! YOU LOST !!!')},10);
+				} 	
+				moves = data.data;				
+		   } else if(data.type === 'start') {				
+				symbol = data.symbol;
+				moves = {};
+				renderGame({});
+		   }			  
+		});
+				
+		send = function (data, id){			
+			connection.send(JSON.stringify(
+			{ 
+				data: data,
+				id : id,
+				type:'move'
+			}));
+		},
+		
+		challenge = function (player2){		
+			connection.send(JSON.stringify(
+			{ 				
+				type:'challenge',
+				otherPlayer: player2
+			}));
+			waiting = true;
+		},
+		
+		clickEvent = function(event) {
+			if(waiting) return;
+			var innerText = event.currentTarget.innerText
+			if(innerText.trim().length === 0) {
+				event.currentTarget.innerText = symbol;
+			}
+			moves[event.currentTarget.id] = symbol;
+			send(moves,event.currentTarget.id);
+			waiting = true;
+		},
+
+		renderGame = function(inputString) {			
+			var tictocCells = document.querySelectorAll(".tictoc .tictocRow .tictocTd");
+			tictocCells.forEach(tictocCell => {
+				var id = tictocCell.id;
+				tictocCell.innerText = inputString[id] ? inputString[id] : "";					
+			});
+			waiting = false;
+		}		
+		
+		return {
+			send : send	,
+			challenge : challenge,
+			clickEvent: clickEvent			
+		}
+				
+	})();
+</script>
+
+</head>
+<body>
+<div>
+<select id="players" onchange="challenge(this.value)"> 
+</select>
+
+<br>
+<br>
+
+<table class="tictoc">
+<tr class="tictocRow" id="1">
+<td class="tictocTd" onclick="clickEvent(event)" id = "11"> </td>
+<td class="tictocTd" onclick="clickEvent(event)" id="12"> </td>
+<td class="tictocTd" onclick="clickEvent(event)" id="13"> </td>
+</tr>
+<tr class="tictocRow" id="2">
+<td class="tictocTd" onclick="clickEvent(event)" id="21"> </td>
+<td class="tictocTd" onclick="clickEvent(event)" id="22"> </td>
+<td class="tictocTd" onclick="clickEvent(event)" id="23"> </td>
+</tr>
+<tr class="tictocRow" id="3">
+<td class="tictocTd" onclick="clickEvent(event)" id="31"> </td>
+<td class="tictocTd" onclick="clickEvent(event)" id="32"> </td>
+<td class="tictocTd" onclick="clickEvent(event)" id="33"> </td>
+</tr>
+</table>
+
+</div>
+</body>
+</html>
